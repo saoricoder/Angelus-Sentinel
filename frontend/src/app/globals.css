@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #5a67d8;
+  --color-primary-dark: #434190;
+  --color-surface: #ffffff;
+  --color-background: #f1f5f9;
+  --color-text: #1a202c;
+  --color-text-muted: #718096;
+  
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Outfit', sans-serif;
+
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-bold tracking-tight;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-xl;
+  }
+  
+  .stat-value {
+    @apply text-4xl font-bold text-primary tracking-tighter;
+  }
+  
+  .badge-online {
+    @apply flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold uppercase tracking-wider;
+  }
+}
