@@ -32,13 +32,13 @@ def initialize_firebase():
                     return None
             
             firebase_app = firebase_admin.initialize_app(cred)
-            db = firestore.client()
-            print("Firebase inicializado correctamente por Angelus Sentinel")
+            db = firestore.client(database_id="sentinel")
+            print("Firebase inicializado correctamente en la base de datos 'sentinel'")
         except Exception as e:
             print(f"Error al inicializar Firebase: {e}")
             return None
     else:
-        db = firestore.client()
+        db = firestore.client(database_id="sentinel")
     
     return db
 
