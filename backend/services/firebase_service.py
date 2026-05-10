@@ -44,3 +44,53 @@ def initialize_firebase():
 
 # Inicializar al importar si es posible
 db = initialize_firebase()
+
+def federated_search(name_query: str = None, ci_query: str = None):
+    """
+    Busca un paciente en las 6 bases de datos simuladas.
+    Agrupa resultados por CI.
+    """
+    collections = [
+        "db_hospital_publico", "db_hospital_privado", "db_clinica", 
+        "db_seguro_iess", "db_seguro_privado", "db_salud_publica"
+    ]
+    
+    results_by_ci = {}
+    
+    if not db:
+        return results_by_ci
+
+    for col_name in collections:
+        col_ref = db.collection(col_name)
+        docs = col_ref.stream()
+        
+        for doc in docs:
+            data = doc.to_dict()
+            p_name = data.get("name", "").lower()
+            p_id = data.get("id", "")
+            
+            # Match por CI (prioritario) o por Nombre
+            match = False
+            if ci_query and ci_query == p_id:
+                match = True
+            elif name_query and name_query.lower() in p_name:
+                match = True
+                
+            if match:
+                if p_id not in results_by_ci:
+                    results_by_ci[p_id] = {
+                        "id": p_id,
+                        "name": data.get("name"),
+                        "sources": []
+                    }
+                # Añadir datos de esta fuente
+                source_data = {"source": col_name, "data": data}
+                results_by_ci[p_id]["sources"].append(source_data)
+                
+                # Consolidar datos para análisis
+                if col_name in ["db_hospital_publico", "db_hospital_privado", "db_clinica"]:
+                    results_by_ci[p_id]["clinical_history"] = data
+                if col_name in ["db_seguro_iess", "db_seguro_privado"]:
+                    results_by_ci[p_id]["insurance_policy"] = data
+                    
+    return list(results_by_ci.values())

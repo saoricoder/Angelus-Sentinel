@@ -140,17 +140,25 @@ class ChatPayload(BaseModel):
     message: str
     operator_name: Optional[str] = "Gestor"
     confirmed_patient_id: Optional[str] = None
+    form_data: Optional[dict] = None
+
+from backend.services.firebase_service import federated_search
 
 @app.post("/chat")
 async def angelus_chat(payload: ChatPayload):
     try:
+        # Caso 1: Resolución de Identidad Confirmada (Humano ya eligió)
         if payload.confirmed_patient_id:
-            patient_doc = db.collection("patients").document(payload.confirmed_patient_id).get()
-            patient_data = patient_doc.to_dict()
-            policy_doc = db.collection("policies").document(patient_data["policy_id"]).get()
-            policy_data = policy_doc.to_dict()
+            matches = federated_search(ci_query=payload.confirmed_patient_id)
+            if not matches:
+                return {"type": "ERROR", "reply": "Paciente no encontrado en las bases federadas."}
+            patient_data = matches[0]
             
-            analysis_raw = await gemini_service.analyze_emergency_entry(patient_data, policy_data, payload.operator_name)
+            # Simular datos para Angelus
+            p_basic = {"name": patient_data["name"], "id": patient_data["id"]}
+            p_policy = patient_data.get("insurance_policy", {"status": "NO ENCONTRADA"})
+            
+            analysis_raw = await gemini_service.analyze_emergency_entry(p_basic, p_policy, payload.operator_name)
             clean_json = analysis_raw.replace("```json", "").replace("```", "").strip()
             analysis_data = json.loads(clean_json)
             
@@ -158,21 +166,30 @@ async def angelus_chat(payload: ChatPayload):
                 "patient_id": payload.confirmed_patient_id,
                 "patient_name": patient_data.get("name"),
                 "hospital_id": "HOSP-01",
-                "emergency_type": "Confirmado por chat",
+                "emergency_type": "Ingreso post-confirmación",
                 "timestamp": datetime.now().isoformat(),
                 "analysis": analysis_data
             }
             db.collection("alerts").add(alert_data)
-            await notification_service.notify_all(alert_data)
+            await notification_service.notify_all(alert_data, federated_data=patient_data)
             
             return {
                 "type": "RESULT",
                 "reply": analysis_data.get("angelus_reply"),
-                "analysis": analysis_data
+                "analysis": analysis_data,
+                "color": analysis_data.get("triage_color")
             }
 
-        entities = await gemini_service.extract_entities(payload.message)
-        name = entities.get("patient_name")
+        # Extraer datos de la petición (Formulario o NLP)
+        if payload.form_data:
+            name = f"{payload.form_data.get('nombre', '')} {payload.form_data.get('apellido', '')}".strip()
+            ci = payload.form_data.get("ci")
+            symptoms = payload.form_data.get("enfermedad", "No especificado")
+        else:
+            entities = await gemini_service.extract_entities(payload.message)
+            name = entities.get("patient_name")
+            ci = None
+            symptoms = entities.get("emergency_type", "No especificado")
         
         if not name:
             return {
@@ -180,57 +197,48 @@ async def angelus_chat(payload: ChatPayload):
                 "reply": "He recibido su mensaje, pero no logro identificar el nombre del paciente. ¿Podría proporcionarlo?"
             }
 
-        patients_ref = db.collection("patients")
-        all_docs = patients_ref.stream()
+        # Caso 2: Búsqueda Federada
+        matches = federated_search(name_query=name, ci_query=ci)
         
-        # Búsqueda inteligente por nombre (insensible a mayúsculas y subcadenas)
-        name_query = name.lower()
-        matches = []
-        for doc in all_docs:
-            p_data = doc.to_dict()
-            p_name = p_data.get("name", "").lower()
-            if name_query in p_name:
-                matches.append(p_data)
-
         if len(matches) == 0:
-            # Análisis preliminar de síntomas antes de pedir identificación
-            symptoms = entities.get("emergency_type", "No especificado")
             pre = await gemini_service.pre_triage(symptoms)
             return {
                 "type": "QUESTION",
                 "color": pre["color"],
-                "reply": f"Análisis preliminar de Angelus: Prioridad {pre['priority']}. {pre['reasoning']}. No encuentro a '{name}' en el registro. Por favor, proporcione el Número de Cédula del paciente para validación."
+                "reply": f"Análisis preliminar de Angelus: Prioridad {pre['priority']}. {pre['reasoning']}. He buscado en el ecosistema federado y no encuentro registros para '{name}'. Para crear un ingreso nuevo o validar cobertura externa, por favor proporcione su Número de Cédula."
             }
         
+        # Caso 3: Desambiguación
         if len(matches) > 1:
-            # Análisis preliminar incluso en desambiguación
-            symptoms = entities.get("emergency_type", "No especificado")
             pre = await gemini_service.pre_triage(symptoms)
             return {
                 "type": "DISAMBIGUATION",
                 "color": pre["color"],
-                "reply": f"Prioridad detectada: {pre['priority']}. He detectado {len(matches)} pacientes que coinciden con '{name}'. Seleccione el correcto por su número de cédula:",
-                "options": [{"id": m["id"], "label": f"{m['name']} (Cédula: {m['id']})"} for m in matches]
+                "reply": f"Prioridad preliminar: {pre['priority']}. He detectado {len(matches)} pacientes que coinciden con '{name}' en diferentes bases de datos. Por favor, confirme el paciente correcto:",
+                "options": [{"id": m["id"], "label": f"{m['name']} (Cédula: {m['id']}) - Registros en {len(m['sources'])} sistemas"} for m in matches]
             }
 
+        # Caso 4: Coincidencia Única (Agregación)
         patient_data = matches[0]
-        policy_doc = db.collection("policies").document(patient_data["policy_id"]).get()
-        policy_data = policy_doc.to_dict()
         
-        analysis_raw = await gemini_service.analyze_emergency_entry(patient_data, policy_data, payload.operator_name)
+        # Simular datos para Angelus
+        p_basic = {"name": patient_data["name"], "id": patient_data["id"]}
+        p_policy = patient_data.get("insurance_policy", {"status": "NO ENCONTRADA", "message": "Paciente solo existe en clínicas/hospitales públicos."})
+        
+        analysis_raw = await gemini_service.analyze_emergency_entry(p_basic, p_policy, payload.operator_name)
         clean_json = analysis_raw.replace("```json", "").replace("```", "").strip()
         analysis_data = json.loads(clean_json)
         
         alert_data = {
             "patient_id": patient_data["id"],
             "patient_name": patient_data["name"],
-            "hospital_id": entities.get("hospital_name") or "HOSP-01",
-            "emergency_type": entities.get("emergency_type") or "Emergencia por Chat",
+            "hospital_id": "HOSP-01",
+            "emergency_type": symptoms,
             "timestamp": datetime.now().isoformat(),
             "analysis": analysis_data
         }
         db.collection("alerts").add(alert_data)
-        await notification_service.notify_all(alert_data)
+        await notification_service.notify_all(alert_data, federated_data=patient_data)
 
         return {
             "type": "RESULT",
@@ -240,7 +248,9 @@ async def angelus_chat(payload: ChatPayload):
         }
 
     except Exception as e:
-        return {"type": "ERROR", "reply": f"Error en mi núcleo de procesamiento: {str(e)}"}
+        import traceback
+        traceback.print_exc()
+        return {"type": "ERROR", "reply": f"Error en mi núcleo de procesamiento federado: {str(e)}"}
 
 if __name__ == "__main__":
     import uvicorn
