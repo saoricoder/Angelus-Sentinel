@@ -135,6 +135,19 @@ async def get_patients():
         return [doc.to_dict() for doc in docs]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/patients/{cedula}")
+async def get_patient_by_cedula(cedula: str):
+    try:
+        # Use federated search to find patient by cédula
+        matches = federated_search(ci_query=cedula)
+        if matches:
+            # Return the first match (most recent)
+            return matches[0]
+        else:
+            raise HTTPException(status_code=404, detail="Patient not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 class ChatPayload(BaseModel):
     message: str

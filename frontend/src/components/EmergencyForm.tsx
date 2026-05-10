@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Send, AlertTriangle, ShieldCheck, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Send, AlertTriangle, ShieldCheck, Loader2, ClipboardCheck } from "lucide-react";
 
 export default function EmergencyForm() {
   const [formData, setFormData] = useState({
@@ -15,6 +15,44 @@ export default function EmergencyForm() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSearchingCi, setIsSearchingCi] = useState(false);
+  const [patientFound, setPatientFound] = useState(false);
+
+  // Autocomplete logic for cédula
+  useEffect(() => {
+    const searchPatientByCi = async () => {
+      if (formData.ci.length === 10 && /^\d+$/.test(formData.ci)) {
+        setIsSearchingCi(true);
+        try {
+          const response = await fetch(`http://localhost:8000/patients/${formData.ci}`);
+          if (response.ok) {
+            const patientData = await response.json();
+            if (patientData && patientData.name) {
+              const nameParts = patientData.name.split(' ');
+              setFormData(prev => ({
+                ...prev,
+                nombre: nameParts[0] || '',
+                apellido: nameParts.slice(1).join(' ') || ''
+              }));
+              setPatientFound(true);
+            }
+          } else {
+            setPatientFound(false);
+          }
+        } catch (error) {
+          console.error("Error searching patient:", error);
+          setPatientFound(false);
+        } finally {
+          setIsSearchingCi(false);
+        }
+      } else {
+        setPatientFound(false);
+      }
+    };
+
+    const timeoutId = setTimeout(searchPatientByCi, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.ci]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +76,7 @@ Seguro: ${formData.posee_seguro ? "Sí (Póliza: " + formData.numero_seguro + ")
       
       // Limpiar un poco el formulario
       setFormData(prev => ({...prev, enfermedad: "", ci: "", numero_seguro: ""}));
+      setPatientFound(false);
       
     } catch (error) {
       console.error("Error al procesar formulario:", error);
@@ -52,17 +91,21 @@ Seguro: ${formData.posee_seguro ? "Sí (Póliza: " + formData.numero_seguro + ")
       ...prev,
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
     }));
+    
+    // Reset patient found status if CI changes
+    if (name === 'ci') {
+      setPatientFound(false);
+    }
   };
 
   return (
     <div className="glass-card flex flex-col h-full border-indigo-100 bg-white overflow-hidden shadow-2xl p-6">
       <div className="flex items-center gap-3 mb-4 border-b pb-4">
-        <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center text-rose-600 shadow-inner">
-          <AlertTriangle size={20} />
+        <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 shadow-inner">
+          <ClipboardCheck size={20} />
         </div>
         <div>
           <h2 className="text-xl font-black text-slate-800 tracking-tight">Registro de Admisión</h2>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Pacientes Críticos</p>
         </div>
       </div>
 
@@ -70,17 +113,53 @@ Seguro: ${formData.posee_seguro ? "Sí (Póliza: " + formData.numero_seguro + ")
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nombre *</label>
-            <input required type="text" name="nombre" value={formData.nombre} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 outline-none transition-all" placeholder="Ej. Juan" />
+            <input 
+              required 
+              type="text" 
+              name="nombre" 
+              value={formData.nombre} 
+              onChange={handleChange} 
+              readOnly={patientFound}
+              className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 outline-none transition-all ${patientFound ? 'bg-slate-100 cursor-not-allowed' : ''}`} 
+              placeholder="Ej. Juan" 
+            />
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Apellido *</label>
-            <input required type="text" name="apellido" value={formData.apellido} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 outline-none transition-all" placeholder="Ej. Pérez" />
+            <input 
+              required 
+              type="text" 
+              name="apellido" 
+              value={formData.apellido} 
+              onChange={handleChange} 
+              readOnly={patientFound}
+              className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 outline-none transition-all ${patientFound ? 'bg-slate-100 cursor-not-allowed' : ''}`} 
+              placeholder="Ej. Pérez" 
+            />
           </div>
         </div>
 
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cédula de Identidad</label>
-          <input type="text" name="ci" value={formData.ci} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 outline-none transition-all" placeholder="Ej. 0912345678" />
+          <div className="relative">
+            <input 
+              type="text" 
+              name="ci" 
+              value={formData.ci} 
+              onChange={handleChange} 
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 outline-none transition-all" 
+              placeholder="Ej. 0912345678" 
+              maxLength={10}
+            />
+            {isSearchingCi && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <Loader2 className="animate-spin text-rose-500" size={16} />
+              </div>
+            )}
+          </div>
+          {patientFound && (
+            <p className="text-xs text-emerald-600 font-medium">✓ Paciente encontrado automáticamente</p>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -116,7 +195,7 @@ Seguro: ${formData.posee_seguro ? "Sí (Póliza: " + formData.numero_seguro + ")
           )}
         </div>
 
-        <button disabled={isSubmitting} type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-3 rounded-xl shadow-lg shadow-rose-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4 disabled:opacity-70 text-base uppercase tracking-widest">
+        <button disabled={isSubmitting || isSearchingCi} type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-3 rounded-xl shadow-lg shadow-rose-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4 disabled:opacity-70 text-base uppercase tracking-widest">
           {isSubmitting ? (
             <Loader2 className="animate-spin" size={20} />
           ) : (
