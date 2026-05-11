@@ -47,7 +47,11 @@ pip install -r tests/requirements.txt
 
 ### Ejecutar todos los tests
 ```bash
-pytest tests/ -v
+# Versión síncrona (compatibilidad sin pytest-asyncio)
+pytest tests/test_angelus_sentinel_sync.py -v
+
+# Versión asíncrona (requiere pytest-asyncio)
+pytest tests/test_angelus_sentinel.py -v
 ```
 
 ### Ejecutar tests por categoría
