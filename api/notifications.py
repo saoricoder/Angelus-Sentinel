@@ -1,70 +1,11 @@
 import json
-import sys
-import os
 from datetime import datetime, timedelta
-
-# Add backend directory to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
-
-# Import Firebase configuration
-try:
-    from backend.services.firebase_service import db
-    from firebase_admin import firestore
-    FIREBASE_AVAILABLE = True
-except ImportError:
-    FIREBASE_AVAILABLE = False
-    db = None
 
 def handler(request):
     """Vercel serverless function for notifications history - Reto 4"""
     
-    # Handle CORS
-    if request.method == "OPTIONS":
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-            },
-            'body': ''
-        }
-    
     try:
-        # Try to get notifications from Firebase
-        if FIREBASE_AVAILABLE and db:
-            try:
-                notifications_ref = db.collection("notifications")
-                query = notifications_ref.order_by("timestamp", direction=firestore.Query.DESCENDING).limit(20)
-                docs = query.stream()
-                
-                notifications = []
-                for doc in docs:
-                    notification_data = doc.to_dict()
-                    # Ensure required fields
-                    notification_data['id'] = doc.id
-                    if 'timestamp' not in notification_data:
-                        notification_data['timestamp'] = datetime.now().isoformat()
-                    if 'cedula' not in notification_data:
-                        notification_data['cedula'] = 'N/A'
-                    if 'status' not in notification_data:
-                        notification_data['status'] = 'UNKNOWN'
-                    notifications.append(notification_data)
-                
-                if notifications:
-                    return {
-                        'statusCode': 200,
-                        'headers': {
-                            'Content-Type': 'application/json',
-                            'Access-Control-Allow-Origin': '*',
-                        },
-                        'body': json.dumps(notifications)
-                    }
-            except Exception as firebase_error:
-                print(f"Firebase error: {firebase_error}")
-                # Fall back to mock data if Firebase fails
-        
-        # Fallback to mock notifications data
+        # Generate mock notifications data for testing
         mock_notifications = generate_mock_notifications()
         
         return {
@@ -102,7 +43,7 @@ def generate_mock_notifications():
             "timestamp": (now - timedelta(minutes=5)).isoformat(),
             "cedula": "1726354910",
             "target": "Departamento de Urgencias (Hospital)",
-            "message": "Alerta Clínica: Paciente Juan Pérez (1726354910) ingresado con triage HIGH.",
+            "message": "Alerta Clinica: Paciente Juan Pérez (1726354910) ingresado con triage HIGH.",
             "type": "HOSPITAL",
             "status": "COMPLETADO",
             "payload": {
@@ -111,7 +52,7 @@ def generate_mock_notifications():
                 "triage_priority": "HIGH",
                 "symptoms": "Paciente en admisión de emergencia",
                 "clinical_history": [],
-                "ai_recommendation": "Paciente estable para observación"
+                "ai_recommendation": "Paciente estable para observacion"
             }
         },
         {
@@ -119,7 +60,7 @@ def generate_mock_notifications():
             "timestamp": (now - timedelta(minutes=15)).isoformat(),
             "cedula": "0912345678",
             "target": "Departamento de Urgencias (Hospital)",
-            "message": "Alerta Clínica: Paciente María García (0912345678) ingresado con triage MEDIUM.",
+            "message": "Alerta Clinica: Paciente María García (0912345678) ingresado con triage MEDIUM.",
             "type": "HOSPITAL",
             "status": "COMPLETADO",
             "payload": {
@@ -140,7 +81,7 @@ def generate_mock_notifications():
             "timestamp": (now - timedelta(minutes=5)).isoformat(),
             "cedula": "1726354910",
             "target": "Gestor de Autorizaciones (Aseguradora)",
-            "message": "Validación de Cobertura: Paciente Juan Pérez (1726354910). Estado de autorización: APPROVED.",
+            "message": "Validacion de Cobertura: Paciente Juan Pérez (1726354910). Estado de autorizacion: APPROVED.",
             "type": "INSURANCE",
             "status": "COMPLETADO",
             "payload": {
@@ -156,7 +97,7 @@ def generate_mock_notifications():
             "timestamp": (now - timedelta(minutes=15)).isoformat(),
             "cedula": "0912345678",
             "target": "Gestor de Autorizaciones (Aseguradora)",
-            "message": "Validación de Cobertura: Paciente María García (0912345678). Estado de autorización: APPROVED.",
+            "message": "Validacion de Cobertura: Paciente María García (0912345678). Estado de autorizacion: APPROVED.",
             "type": "INSURANCE",
             "status": "COMPLETADO",
             "payload": {
