@@ -89,3 +89,6 @@ def handler(request):
                 "message": "Error procesando admisión de emergencia"
             })
         }
+
+# Vercel expects 'app' or 'handler'
+app = handler
