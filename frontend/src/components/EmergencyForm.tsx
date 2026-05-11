@@ -81,13 +81,37 @@ Nombre: ${formData.nombre}
 C.I: ${formData.ci || 'No proporcionado'}
 Seguro: ${formData.posee_seguro ? "Sí (Póliza: " + formData.numero_seguro + ")" : "No"}`;
 
-      const event = new CustomEvent('sentinel-form-submit', { 
-        detail: { 
-          text: formStr, 
-          formData: formData 
-        } 
+      // 1. Enviar al backend (Reto 4 - Webhook)
+      const response = await fetch("/api/admision/emergencia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cedula: formData.ci,
+          nombre_completo: formData.nombre,
+          numero_seguro: formData.numero_seguro,
+          hospital_id: "HOSP-METROPOLITANO",
+          tipo_emergencia: "EMERGENCIA_GENERAL",
+          sintomas: "Paciente en admisión de emergencia",
+          operador_id: "OPERATOR-WEB"
+        })
       });
-      window.dispatchEvent(event);
+
+      if (response.ok) {
+        const admissionData = await response.json();
+        console.log("✅ Admisión procesada:", admissionData);
+        
+        // 2. Disparar evento local para UI
+        const event = new CustomEvent('sentinel-form-submit', { 
+          detail: { 
+            text: formStr, 
+            formData: formData,
+            admissionData: admissionData
+          } 
+        });
+        window.dispatchEvent(event);
+      } else {
+        throw new Error("Error en procesamiento de admisión");
+      }
       
       // Limpiar un poco el formulario
       setFormData(prev => ({...prev, ci: "", numero_seguro: ""}));
@@ -95,6 +119,11 @@ Seguro: ${formData.posee_seguro ? "Sí (Póliza: " + formData.numero_seguro + ")
       
     } catch (error) {
       console.error("Error al procesar formulario:", error);
+      // Evento de error para UI
+      const errorEvent = new CustomEvent('sentinel-form-error', { 
+        detail: { error: error.message } 
+      });
+      window.dispatchEvent(errorEvent);
     } finally {
       setIsSubmitting(false);
     }
