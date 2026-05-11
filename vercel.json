@@ -8,12 +8,20 @@
     {
       "src": "api/admissions.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "api/notifications.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/api/admision/emergencia",
       "dest": "/api/admissions.py"
+    },
+    {
+      "src": "/api/notifications",
+      "dest": "/api/notifications.py"
     },
     {
       "src": "/(.*)",
