@@ -15,7 +15,8 @@ app = FastAPI(title="Angelus Sentinel API")
 allowed_origins = [
     "http://localhost:3000", 
     "http://127.0.0.1:3000", 
-    "http://[::1]:3000"
+    "http://[::1]:3000",
+    "https://angelus-sentinel.vercel.app"
 ]
 
 # Add production domain if available
