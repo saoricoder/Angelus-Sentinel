@@ -11,22 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Angelus Sentinel API")
 
-# Dynamic CORS configuration for development and production
-allowed_origins = [
-    "http://localhost:3000", 
-    "http://127.0.0.1:3000", 
-    "http://[::1]:3000",
-    "https://angelus-sentinel.vercel.app"
-]
-
-# Add production domain if available
-production_url = os.getenv("PRODUCTION_URL")
-if production_url:
-    allowed_origins.append(production_url)
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://[::1]:3000", "https://angelus-sentinel.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -318,8 +305,7 @@ async def _check_preexisting_conditions_async(cedula: str):
         return {"status": "ERROR", "message": f"Error al consultar historial: {str(e)}"}
 
 async def _send_simultaneous_notifications(payload: AdmisionEmergencia, admission_id: str):
-    """Envía notificaciones SIMULTÁNEAS a Hospital y Seguro"""
-    import asyncio
+    """Envía notificaciones simultáneas a Hospital y Seguro"""
     timestamp = datetime.now().isoformat()
     
     # Notificación para Hospital
@@ -347,38 +333,23 @@ async def _send_simultaneous_notifications(payload: AdmisionEmergencia, admissio
         "admission_id": admission_id
     }
     
-    # 🚀 EJECUCIÓN SIMULTÁNEA REAL (Reto 4)
-    async def save_hospital_notification():
-        return db.collection("notifications").add(hospital_notification)
+    # Guardar notificaciones en Firebase
+    db.collection("notifications").add(hospital_notification)
+    db.collection("notifications").add(insurance_notification)
     
-    async def save_insurance_notification():
-        return db.collection("notifications").add(insurance_notification)
-    
-    async def send_notification_service():
-        return await notification_service.notify_all({
-            "patient_id": payload.cedula,
-            "patient_name": payload.nombre_completo,
-            "hospital_id": payload.hospital_id,
-            "emergency_type": payload.tipo_emergencia,
-            "timestamp": timestamp,
-            "admission_id": admission_id
-        })
-    
-    # ⚡ EJECUTAR TODAS LAS NOTIFICACIONES EN PARALELO
-    results = await asyncio.gather(
-        save_hospital_notification(),
-        save_insurance_notification(),
-        send_notification_service(),
-        return_exceptions=True
-    )
-    
-    print(f"📡 [SIMULTÁNEO] Notificaciones enviadas para {payload.nombre_completo} en paralelo")
+    # Enviar a través del servicio de notificaciones
+    await notification_service.notify_all({
+        "patient_id": payload.cedula,
+        "patient_name": payload.nombre_completo,
+        "hospital_id": payload.hospital_id,
+        "emergency_type": payload.tipo_emergencia,
+        "timestamp": timestamp,
+        "admission_id": admission_id
+    })
     
     return {
         "hospital": {"status": "delivered", "timestamp": timestamp},
-        "insurance": {"status": "delivered", "timestamp": timestamp},
-        "notification_service": {"status": "delivered", "timestamp": timestamp},
-        "execution": "simultaneous_parallel"
+        "insurance": {"status": "delivered", "timestamp": timestamp}
     }
 
 class ChatPayload(BaseModel):
@@ -532,9 +503,6 @@ async def angelus_chat(payload: ChatPayload):
         import traceback
         traceback.print_exc()
         return {"type": "ERROR", "reply": f"Error en mi núcleo de procesamiento federado: {str(e)}"}
-
-# Vercel serverless entry point
-app_handler = app
 
 if __name__ == "__main__":
     import uvicorn
