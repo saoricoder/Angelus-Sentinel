@@ -6,7 +6,7 @@
       "use": "@vercel/next"
     },
     {
-      "src": "api/admision/emergencia.py",
+      "src": "api/admision.py",
       "use": "@vercel/python"
     },
     {
@@ -17,7 +17,7 @@
   "routes": [
     {
       "src": "/api/admision/emergencia",
-      "dest": "/api/admision/emergencia.py"
+      "dest": "/api/admision.py"
     },
     {
       "src": "/api/(.*)",
