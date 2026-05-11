@@ -24,6 +24,13 @@ def handler(request):
         }
     ]
     
-    return json.dumps(notifications)
+    return {
+        'statusCode': 200,
+        'headers': {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+        },
+        'body': json.dumps(notifications)
+    }
 
 app = handler
