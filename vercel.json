@@ -12,6 +12,14 @@
     {
       "src": "api/notifications.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "api/chat.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "api/patients/[ci].py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
@@ -22,6 +30,14 @@
     {
       "src": "/api/notifications",
       "dest": "/api/notifications.py"
+    },
+    {
+      "src": "/api/chat",
+      "dest": "/api/chat.py"
+    },
+    {
+      "src": "/api/patients/(.*)",
+      "dest": "/api/patients/[ci].py"
     },
     {
       "src": "/(.*)",
