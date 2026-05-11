@@ -21,7 +21,7 @@
   "routes": [
     {
       "src": "/api/admision/emergencia",
-      "dest": "/api/admissions.py"
+      "dest": "/api/admissions_fixed.py"
     },
     {
       "src": "/api/chat",
