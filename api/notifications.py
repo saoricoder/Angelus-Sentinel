@@ -1,52 +1,24 @@
 import json
-from datetime import datetime
 
 def handler(request):
     """Vercel serverless function for notifications - Reto 4"""
     
-    # Handle CORS
-    if request.method == "OPTIONS":
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-            },
-            'body': ''
-        }
-    
     try:
-        # Simulate notification logs (Reto 4)
-        notification_logs = [
+        # Simple response for notifications
+        notifications = [
             {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": "2025-05-11T12:58:00.000Z",
                 "target": "Departamento de Urgencias (Hospital)",
-                "message": "Alerta Clínica: Paciente Juan Pérez (1726354910) ingresado con triage HIGH.",
+                "message": "Alerta Clinica: Paciente Juan Pérez (1726354910) ingresado con triage HIGH.",
                 "type": "HOSPITAL",
-                "status": "COMPLETADO",
-                "payload": {
-                    "patient_name": "Juan Pérez",
-                    "ci": "1726354910",
-                    "triage_priority": "HIGH",
-                    "symptoms": "Paciente en admisión de emergencia",
-                    "clinical_history": [],
-                    "ai_recommendation": "Paciente estable para observación"
-                }
+                "status": "COMPLETADO"
             },
             {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": "2025-05-11T12:58:00.000Z",
                 "target": "Gestor de Autorizaciones (Aseguradora)",
-                "message": "Validación de Cobertura: Paciente Juan Pérez (1726354910). Estado de autorización: APPROVED.",
+                "message": "Validacion de Cobertura: Paciente Juan Pérez (1726354910). Estado de autorizacion: APPROVED.",
                 "type": "INSURANCE",
-                "status": "COMPLETADO",
-                "payload": {
-                    "patient_name": "Juan Pérez",
-                    "ci": "1726354910",
-                    "insurance_status": {"policy": "SEG-987654", "status": "ACTIVE"},
-                    "triage_priority": "HIGH",
-                    "decision": "APPROVED"
-                }
+                "status": "COMPLETADO"
             }
         ]
         
@@ -56,7 +28,7 @@ def handler(request):
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
             },
-            'body': json.dumps(notification_logs)
+            'body': json.dumps(notifications)
         }
         
     except Exception as e:
@@ -66,11 +38,7 @@ def handler(request):
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
             },
-            'body': json.dumps({
-                "error": str(e),
-                "message": "Error obteniendo notificaciones"
-            })
+            'body': json.dumps([{"error": str(e)}])
         }
 
-# Vercel expects 'app' or 'handler'
 app = handler
