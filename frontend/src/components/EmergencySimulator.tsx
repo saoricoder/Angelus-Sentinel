@@ -12,7 +12,7 @@ export default function EmergencySimulator() {
   const [result, setResult] = useState<any>(null);
 
   useEffect(() => {
-    fetch("http://localhost:8000/patients")
+    fetch("/api/patients")
       .then(res => res.json())
       .then(data => {
         setPatients(data);
@@ -24,7 +24,7 @@ export default function EmergencySimulator() {
     setLoading(true);
     setResult(null);
     try {
-      const response = await fetch("http://localhost:8000/webhook/emergency", {
+      const response = await fetch("/api/webhook/emergency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

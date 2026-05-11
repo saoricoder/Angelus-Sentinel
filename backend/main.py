@@ -11,9 +11,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Angelus Sentinel API")
 
+# Dynamic CORS configuration for development and production
+allowed_origins = [
+    "http://localhost:3000", 
+    "http://127.0.0.1:3000", 
+    "http://[::1]:3000"
+]
+
+# Add production domain if available
+production_url = os.getenv("PRODUCTION_URL")
+if production_url:
+    allowed_origins.append(production_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://[::1]:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -139,21 +151,260 @@ async def get_patients():
 @app.get("/patients/{cedula}")
 async def get_patient_by_cedula(cedula: str):
     try:
-        # Use federated search to find patient by cédula
+        # First, try to find in main patients collection
+        patient_ref = db.collection("patients").document(cedula).get()
+        if patient_ref.exists:
+            patient_data = patient_ref.to_dict()
+            return {
+                "status": "success",
+                "data": {
+                    "cedula": patient_data.get("id", cedula),
+                    "nombre_completo": patient_data.get("name", ""),
+                    "numero_seguro": patient_data.get("policy_id", ""),
+                    "fecha_nacimiento": patient_data.get("birth_date", ""),
+                    "tipo_sangre": patient_data.get("blood_type", "")
+                }
+            }
+        
+        # If not found in main collection, try federated search
         matches = federated_search(ci_query=cedula)
         if matches:
-            # Return the first match (most recent)
-            return matches[0]
+            # Return the first match (most recent) with proper structure
+            match = matches[0]
+            return {
+                "status": "success",
+                "data": {
+                    "cedula": match.get("id", cedula),
+                    "nombre_completo": match.get("name", ""),
+                    "numero_seguro": match.get("insurance_policy", {}).get("id", ""),
+                    "fecha_nacimiento": match.get("birth_date", ""),
+                    "tipo_sangre": match.get("blood_type", "")
+                }
+            }
         else:
-            raise HTTPException(status_code=404, detail="Patient not found")
+            return {
+                "status": "not_found",
+                "message": "Paciente no encontrado en la base de datos"
+            }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class AdmisionEmergencia(BaseModel):
+    cedula: str
+    nombre_completo: str
+    numero_seguro: str
+    hospital_id: str
+    tipo_emergencia: str
+    sintomas: str
+    operador_id: str
+
+@app.post("/admision/emergencia")
+async def admision_emergencia(payload: AdmisionEmergencia):
+    try:
+        # Generar ID único de admisión
+        admission_id = f"ADM-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        
+        # 1. Validar póliza con Gemini Pro
+        policy_validation = await _validate_policy_async(payload)
+        
+        # 2. Revisar historial de preexistencias
+        preexistencias = await _check_preexisting_conditions_async(payload.cedula)
+        
+        # 3. Generar respuestas secuenciales para chat
+        chat_responses = [
+            {
+                "step": "validacion_poliza",
+                "message": "Validando póliza...",
+                "delay": 0
+            },
+            {
+                "step": "validacion_poliza_result",
+                "message": policy_validation.get("message", "Póliza validada automáticamente"),
+                "delay": 1500
+            },
+            {
+                "step": "revision_preexistencias",
+                "message": f"Revisando historial de preexistencias para paciente [{payload.nombre_completo}]...",
+                "delay": 1500
+            },
+            {
+                "step": "revision_preexistencias_result",
+                "message": preexistencias.get("message", "No se encontraron atenciones previas en el historial."),
+                "delay": 1500
+            }
+        ]
+        
+        # 4. Enviar notificaciones simultáneas
+        notifications = await _send_simultaneous_notifications(payload, admission_id)
+        
+        # 5. Guardar registro de admisión
+        admission_record = {
+            "admission_id": admission_id,
+            "cedula": payload.cedula,
+            "nombre_completo": payload.nombre_completo,
+            "numero_seguro": payload.numero_seguro,
+            "hospital_id": payload.hospital_id,
+            "tipo_emergencia": payload.tipo_emergencia,
+            "sintomas": payload.sintomas,
+            "operador_id": payload.operador_id,
+            "timestamp": datetime.now().isoformat(),
+            "status": "completed",
+            "policy_validation": policy_validation,
+            "preexistencias": preexistencias,
+            "notifications": notifications
+        }
+        
+        db.collection("admissions").add(admission_record)
+        
+        return {
+            "status": "processing",
+            "admission_id": admission_id,
+            "timestamp": datetime.now().isoformat(),
+            "estimated_duration": "15 segundos",
+            "chat_responses": chat_responses,
+            "notifications": notifications
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def _validate_policy_async(payload: AdmisionEmergencia):
+    """Valida la póliza usando Gemini Pro"""
+    try:
+        # Simular validación con Gemini
+        prompt = f"""
+        {ANGELUS_PERSONALITY}
+        
+        Valida la póliza de seguro {payload.numero_seguro} para el paciente {payload.nombre_completo}.
+        Tipo de emergencia: {payload.tipo_emergencia}
+        
+        Responde en JSON:
+        {{"status": "APPROVED"|"REJECTED"|"MANUAL_REVIEW", "message": "Mensaje de validación"}}
+        """
+        
+        # Aquí iría la llamada real a Gemini
+        # Por ahora, simulamos respuesta
+        return {
+            "status": "APPROVED",
+            "message": "Éxito: Póliza validada automáticamente",
+            "policy_number": payload.numero_seguro,
+            "coverage_level": "PREMIUM"
+        }
+    except Exception as e:
+        return {"status": "ERROR", "message": f"Error en validación: {str(e)}"}
+
+async def _check_preexisting_conditions_async(cedula: str):
+    """Revisa historial médico del paciente"""
+    try:
+        # Buscar historial en Firebase
+        matches = federated_search(ci_query=cedula)
+        if matches and matches[0].get("clinical_history"):
+            history = matches[0]["clinical_history"]
+            medical_records = history.get("medical_history", [])
+            
+            if medical_records:
+                return {
+                    "status": "FOUND",
+                    "message": f"Se encontraron {len(medical_records)} atenciones previas:",
+                    "records": medical_records
+                }
+        
+        return {
+            "status": "NOT_FOUND",
+            "message": "No se encontraron atenciones previas en el historial."
+        }
+    except Exception as e:
+        return {"status": "ERROR", "message": f"Error al consultar historial: {str(e)}"}
+
+async def _send_simultaneous_notifications(payload: AdmisionEmergencia, admission_id: str):
+    """Envía notificaciones simultáneas a Hospital y Seguro"""
+    timestamp = datetime.now().isoformat()
+    
+    # Notificación para Hospital
+    hospital_notification = {
+        "type": "HOSPITAL",
+        "timestamp": timestamp,
+        "patient_id": payload.cedula,
+        "patient_name": payload.nombre_completo,
+        "insurance_status": "VALIDATED",
+        "triage_priority": "HIGH",
+        "hospital_name": payload.hospital_id,
+        "admission_id": admission_id
+    }
+    
+    # Notificación para Seguro
+    insurance_notification = {
+        "type": "INSURANCE",
+        "timestamp": timestamp,
+        "patient_id": payload.cedula,
+        "patient_name": payload.nombre_completo,
+        "policy_number": payload.numero_seguro,
+        "validation_code": f"VAL-{timestamp[-6:]}",
+        "coverage_decision": "APPROVED",
+        "insurance_company": "Sentinel Health",
+        "admission_id": admission_id
+    }
+    
+    # Guardar notificaciones en Firebase
+    db.collection("notifications").add(hospital_notification)
+    db.collection("notifications").add(insurance_notification)
+    
+    # Enviar a través del servicio de notificaciones
+    await notification_service.notify_all({
+        "patient_id": payload.cedula,
+        "patient_name": payload.nombre_completo,
+        "hospital_id": payload.hospital_id,
+        "emergency_type": payload.tipo_emergencia,
+        "timestamp": timestamp,
+        "admission_id": admission_id
+    })
+    
+    return {
+        "hospital": {"status": "delivered", "timestamp": timestamp},
+        "insurance": {"status": "delivered", "timestamp": timestamp}
+    }
 
 class ChatPayload(BaseModel):
     message: str
     operator_name: Optional[str] = "Gestor"
     confirmed_patient_id: Optional[str] = None
     form_data: Optional[dict] = None
+
+@app.get("/admision/{admission_id}/estado")
+async def get_admission_status(admission_id: str):
+    try:
+        # Buscar admisión por ID
+        admissions_ref = db.collection("admissions").where("admission_id", "==", admission_id)
+        docs = admissions_ref.stream()
+        
+        for doc in docs:
+            admission_data = doc.to_dict()
+            return {
+                "status": admission_data.get("status", "processing"),
+                "admission_id": admission_id,
+                "steps_completed": [
+                    {
+                        "step": "validacion_poliza",
+                        "status": "success",
+                        "message": admission_data.get("policy_validation", {}).get("message", "Validación completada"),
+                        "timestamp": admission_data.get("timestamp")
+                    },
+                    {
+                        "step": "revision_preexistencias",
+                        "status": "success",
+                        "message": admission_data.get("preexistencias", {}).get("message", "Revisión completada"),
+                        "timestamp": admission_data.get("timestamp")
+                    }
+                ],
+                "notifications_sent": admission_data.get("notifications", {})
+            }
+        
+        return {
+            "status": "not_found",
+            "message": f"Admisión {admission_id} no encontrada"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 from backend.services.firebase_service import federated_search
 
@@ -264,6 +515,9 @@ async def angelus_chat(payload: ChatPayload):
         import traceback
         traceback.print_exc()
         return {"type": "ERROR", "reply": f"Error en mi núcleo de procesamiento federado: {str(e)}"}
+
+# Vercel serverless entry point
+app_handler = app
 
 if __name__ == "__main__":
     import uvicorn
