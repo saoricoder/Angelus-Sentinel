@@ -81,58 +81,59 @@ export default function SentinelChat() {
       
       // Sequential AI Agent logic - Reto 4 Flow
       const processPatientAdmission = async () => {
-        // 1. First message: "Validando póliza..."
-        await sendMessage("Validando póliza...");
-        
-        // 2. Wait 1.5s then send validation result
-        setTimeout(async () => {
-          const validationResult = "Éxito: Póliza validada automáticamente";
-          await sendMessage(validationResult);
-          
-          // 3. Wait another 1.5s then check preexistencias
-          setTimeout(async () => {
-            await sendMessage(`Revisando historial de preexistencias para paciente [${formData.nombre}]...`);
+        try {
+          // Call the real backend admission API
+          const response = await fetch("/api/admision/emergencia", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cedula: formData.ci,
+              nombre_completo: formData.nombre,
+              numero_seguro: formData.numero_seguro,
+              hospital_id: "HOSP-METROPOLITANO",
+              tipo_emergencia: "EMERGENCIA_GENERAL",
+              sintomas: "Paciente en admisión de emergencia",
+              operador_id: "OPERATOR-WEB"
+            })
+          });
+
+          if (response.ok) {
+            const admissionData = await response.json();
             
-            // 4. Fetch and display previous medical history
-            setTimeout(async () => {
-              try {
-                const response = await fetch(`/api/patients/${formData.ci}`);
-                if (response.ok) {
-                  const patientData = await response.json();
-                  if (patientData && patientData.medical_history && patientData.medical_history.length > 0) {
-                    await sendMessage(`Se encontraron ${patientData.medical_history.length} atenciones previas:`);
-                    patientData.medical_history.forEach((record: any, index: number) => {
-                      setTimeout(async () => {
-                        await sendMessage(`• ${record.date} - ${record.type}: ${record.description}`);
-                      }, index * 800);
-                    });
-                  } else {
-                    await sendMessage("No se encontraron atenciones previas en el historial.");
-                  }
-                }
-              } catch (error) {
-                await sendMessage("Error al consultar historial médico.");
+            // Display the sequential AI responses from backend
+            if (admissionData.chat_responses && Array.isArray(admissionData.chat_responses)) {
+              for (const chatResponse of admissionData.chat_responses) {
+                // Wait for the specified delay before sending each message
+                await new Promise(resolve => setTimeout(resolve, chatResponse.delay || 0));
+                await sendMessage(chatResponse.message);
               }
-              
-              // 5. Update other components if validation successful
-              setTimeout(() => {
-                if (formData.numero_seguro) {
-                  // Trigger updates to Clinical Channel and Insurance Validation
-                  const updateEvent = new CustomEvent('patient-admitted', {
-                    detail: {
-                      patientId: formData.ci,
-                      patientName: formData.nombre,
-                      hasInsurance: true,
-                      policyNumber: formData.numero_seguro,
-                      hospitalName: "HOSP-METROPOLITANO"
-                    }
-                  });
-                  window.dispatchEvent(updateEvent);
-                }
-              }, 1500);
-            }, 1500);
-          }, 1500);
-        }, 1500);
+            }
+
+            // Update other components after all messages are displayed
+            setTimeout(() => {
+              if (formData.numero_seguro) {
+                // Trigger updates to Clinical Channel and Insurance Validation
+                const updateEvent = new CustomEvent('patient-admitted', {
+                  detail: {
+                    patientId: formData.ci,
+                    patientName: formData.nombre,
+                    hasInsurance: true,
+                    policyNumber: formData.numero_seguro,
+                    hospitalName: "HOSP-METROPOLITANO",
+                    admissionId: admissionData.admission_id,
+                    timestamp: admissionData.timestamp
+                  }
+                });
+                window.dispatchEvent(updateEvent);
+              }
+            }, 2000);
+          } else {
+            await sendMessage("Error al procesar la admisión con el backend");
+          }
+        } catch (error) {
+          console.error("Error in admission process:", error);
+          await sendMessage("Error de conexión con el sistema de admisión");
+        }
       };
       
       processPatientAdmission();

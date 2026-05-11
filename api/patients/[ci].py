@@ -15,21 +15,24 @@ def handler(request):
                 'numero_seguro': 'SEG-987654',
                 'apellido': 'Pérez',
                 'edad': 35,
-                'tipo_sangre': 'O+'
+                'tipo_sangre': 'O+',
+                'nombre_completo': 'Juan Pérez'
             },
             '0912345678': { 
                 'nombre': 'María García', 
                 'numero_seguro': 'SEG-123456',
                 'apellido': 'García',
                 'edad': 28,
-                'tipo_sangre': 'A+'
+                'tipo_sangre': 'A+',
+                'nombre_completo': 'María García'
             },
             '1711223344': { 
                 'nombre': 'Carlos Rodríguez', 
                 'numero_seguro': 'SEG-555666',
                 'apellido': 'Rodríguez',
                 'edad': 42,
-                'tipo_sangre': 'B+'
+                'tipo_sangre': 'B+',
+                'nombre_completo': 'Carlos Rodríguez'
             }
         }
         

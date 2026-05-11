@@ -1,7 +1,7 @@
 import google.generativeai as genai
 import json
 import os
-from backend.config import GEMINI_API_KEY, ANGELUS_PROMPT
+from config import GEMINI_API_KEY, ANGELUS_PROMPT
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)

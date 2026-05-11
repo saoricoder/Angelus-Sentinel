@@ -2,7 +2,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import os
 import json
-from backend.config import load_dotenv
+from config import load_dotenv
 
 # Asegurar que las variables de entorno estén cargadas
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))

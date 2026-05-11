@@ -36,7 +36,7 @@ export default function EmergencyForm() {
           const patientData = await response.json();
           setFormData(prev => ({
             ...prev,
-            nombre: patientData.nombre || '',
+            nombre: patientData.nombre || patientData.nombre_completo || '',
             numero_seguro: patientData.numero_seguro || ''
           }));
           setPatientFound(true);
