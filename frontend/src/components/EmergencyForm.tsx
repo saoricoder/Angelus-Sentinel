@@ -120,8 +120,9 @@ Seguro: ${formData.posee_seguro ? "Sí (Póliza: " + formData.numero_seguro + ")
     } catch (error) {
       console.error("Error al procesar formulario:", error);
       // Evento de error para UI
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       const errorEvent = new CustomEvent('sentinel-form-error', { 
-        detail: { error: error.message } 
+        detail: { error: errorMessage } 
       });
       window.dispatchEvent(errorEvent);
     } finally {
