@@ -37,7 +37,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchLogs();
-    const interval = setInterval(fetchLogs, 5000);
+    const interval = setInterval(fetchLogs, 10000);
     return () => clearInterval(interval);
   }, []);
 

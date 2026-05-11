@@ -32,6 +32,14 @@
       "dest": "/api/patients/[ci].py"
     },
     {
+      "src": "/api/notifications",
+      "dest": "/api/main.py"
+    },
+    {
+      "src": "/api/webhook/(.*)",
+      "dest": "/api/main.py"
+    },
+    {
       "src": "/(.*)",
       "dest": "/frontend/$1"
     }
