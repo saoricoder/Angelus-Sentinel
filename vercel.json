@@ -10,10 +10,6 @@
       "use": "@vercel/python"
     },
     {
-      "src": "api/notifications.py",
-      "use": "@vercel/python"
-    },
-    {
       "src": "api/chat.py",
       "use": "@vercel/python"
     },
@@ -26,10 +22,6 @@
     {
       "src": "/api/admision/emergencia",
       "dest": "/api/admissions.py"
-    },
-    {
-      "src": "/api/notifications",
-      "dest": "/api/notifications.py"
     },
     {
       "src": "/api/chat",
