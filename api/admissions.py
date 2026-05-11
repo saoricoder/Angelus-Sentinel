@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 def handler(request):
-    """Vercel serverless function for admissions"""
+    """Vercel serverless function for admissions - Reto 4"""
     
     # Handle CORS
     if request.method == "OPTIONS":
