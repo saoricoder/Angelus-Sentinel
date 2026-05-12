@@ -36,7 +36,7 @@ export default function EmergencyForm() {
           const patientData = await response.json();
           setFormData(prev => ({
             ...prev,
-            nombre: patientData.nombre || patientData.nombre_completo || '',
+            nombre_completo: patientData.nombre || patientData.nombre_completo || ''
             numero_seguro: patientData.numero_seguro || ''
           }));
           setPatientFound(true);
@@ -86,7 +86,7 @@ Seguro: ${formData.posee_seguro ? "Sí (Póliza: " + formData.numero_seguro + ")
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cedula: formData.ci,
+          patient_id: formData.ci,
           nombre_completo: formData.nombre,
           numero_seguro: formData.numero_seguro,
           hospital_id: "HOSP-METROPOLITANO",

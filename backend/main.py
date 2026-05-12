@@ -5,7 +5,7 @@ from typing import Optional, List
 import json
 from datetime import datetime
 from firebase_admin import firestore
-from services.firebase_service import db
+from backend.services.firebase_service import db
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,13 +13,7 @@ app = FastAPI(title="Angelus Sentinel API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000", 
-        "http://127.0.0.1:3000", 
-        "http://[::1]:3000",
-        "https://angelus-sentinel.vercel.app",
-        "https://angelus-sentinel.vercel.app/"
-    ],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://[::1]:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,8 +41,8 @@ async def root():
         "timestamp": datetime.now().isoformat()
     }
 
-from services.gemini_service import gemini_service
-from services.notification_service import notification_service
+from backend.services.gemini_service import gemini_service
+from backend.services.notification_service import notification_service
 
 # Memoria temporal de sesión para confirmaciones administrativas
 PENDING_CONTEXT = {}
@@ -56,8 +50,8 @@ PENDING_CONTEXT = {}
 @app.post("/webhook/emergency")
 async def emergency_webhook(payload: WebhookPayload):
     try:
-        from services.silo_services import validate_insurance
-        from services.firebase_service import federated_search
+        from backend.services.silo_services import validate_insurance
+        from backend.services.firebase_service import federated_search
         
         # 1. Buscar paciente en la red federada
         matches = federated_search(ci_query=payload.patient_id)
@@ -160,7 +154,7 @@ class ChatPayload(BaseModel):
     form_data: Optional[dict] = None
     history: Optional[List[dict]] = []
 
-from services.firebase_service import federated_search
+from backend.services.firebase_service import federated_search
 
 @app.post("/chat")
 async def angelus_chat(payload: ChatPayload):
